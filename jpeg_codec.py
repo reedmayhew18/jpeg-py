@@ -838,7 +838,7 @@ def jpeg_encode(width, height, pixels, quality=75):
         dqt = bytearray()
         dqt.append(table_id)  # 0=8-bit precision, lower nibble=table ID
         for i in range(64):
-            dqt.append(table[ZIGZAG_ORDER[i]])
+            dqt.append(table[ZIGZAG_ORDER[i]]) # Apply zig-zag order to outgoing jpeg for proper decoding
         out_bytes = b'\xFF\xDB'
         out_bytes += struct.pack('>H', len(dqt) + 2)
         out_bytes += bytes(dqt)
