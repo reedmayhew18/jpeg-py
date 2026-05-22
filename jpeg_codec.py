@@ -837,8 +837,8 @@ def jpeg_encode(width, height, pixels, quality=75):
     def write_dqt(table_id, table):
         dqt = bytearray()
         dqt.append(table_id)  # 0=8-bit precision, lower nibble=table ID
-        for v in table:
-            dqt.append(v)
+        for i in range(64):
+            dqt.append(table[ZIGZAG_ORDER[i]])
         out_bytes = b'\xFF\xDB'
         out_bytes += struct.pack('>H', len(dqt) + 2)
         out_bytes += bytes(dqt)
@@ -991,25 +991,48 @@ class JPEGDecoder:
         # Decode the scan
         return self._decode_scan()
 
-    def _parse_dqt(self, data):
-        """Parse DQT segment."""
+     def _parse_dqt(self, data):
+        """
+        Parse DQT segment.
+
+        JPEG stores quantization table entries in zigzag order. Internally this
+        decoder uses natural row-major 8x8 order, so the table must be unzigzagged
+        after reading.
+        """
         pos = 0
+
         while pos < len(data):
             info = data[pos]
             precision = (info >> 4) & 0x0F  # 0=8-bit, 1=16-bit
             table_id = info & 0x0F
             pos += 1
-            table = []
-            if precision == 0:
-                for i in range(64):
-                    table.append(data[pos + i])
-                pos += 64
-            else:
-                for i in range(64):
-                    table.append(struct.unpack('>H', data[pos + i*2:pos + i*2 + 2])[0])
-                pos += 128
-            self.quant_tables[table_id] = table
 
+            if precision == 0:
+                if pos + 64 > len(data):
+                    raise ValueError("Truncated DQT segment")
+
+                # Values are stored in JPEG zigzag order.
+                raw_table = list(data[pos:pos + 64])
+                pos += 64
+
+            elif precision == 1:
+                if pos + 128 > len(data):
+                    raise ValueError("Truncated 16-bit DQT segment")
+
+                # Values are stored in JPEG zigzag order.
+                raw_table = [
+                    struct.unpack('>H', data[pos + i * 2:pos + i * 2 + 2])[0]
+                    for i in range(64)
+                ]
+                pos += 128
+
+            else:
+                raise ValueError(f"Unsupported DQT precision: {precision}")
+
+            # Critical fix:
+            # Convert from JPEG zigzag order back to natural row-major order.
+            self.quant_tables[table_id] = zigzag_unscan(raw_table)
+                
     def _parse_sof(self, data):
         """Parse SOF0 segment."""
         precision = data[0]
