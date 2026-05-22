@@ -991,7 +991,7 @@ class JPEGDecoder:
         # Decode the scan
         return self._decode_scan()
 
-     def _parse_dqt(self, data):
+    def _parse_dqt(self, data):
         """
         Parse DQT segment.
 
@@ -1293,7 +1293,7 @@ def main():
     enc = sub.add_parser("encode", help="Encode BMP/TIFF to JPEG")
     enc.add_argument("input", help="Input image file (BMP or TIFF)")
     enc.add_argument("output", help="Output JPEG file")
-    enc.add_argument("--quality", type=int, default=75, help="Quality 1-100 (default 75)")
+    enc.add_argument("--quality","-q", type=int, default=75, help="Quality 1-100 (default 75)")
 
     dec = sub.add_parser("decode", help="Decode JPEG to BMP/TIFF")
     dec.add_argument("input", help="Input JPEG file")
